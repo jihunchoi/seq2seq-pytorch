@@ -112,11 +112,12 @@ class NMTDataset(torchtext.data.Dataset):
 class SrcField(torchtext.data.Field):
 
     def __init__(self, lower=True):
-        super().__init__(lower=lower, pad_token=PAD_WORD)
+        super().__init__(lower=lower, pad_token=PAD_WORD, include_lengths=True)
 
 
 class TgtField(torchtext.data.Field):
 
     def __init__(self, lower=True):
         super().__init__(lower=lower, pad_token=PAD_WORD,
-                         init_token=BOS_WORD, eos_token=EOS_WORD)
+                         init_token=BOS_WORD, eos_token=EOS_WORD,
+                         include_lengths=True)

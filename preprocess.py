@@ -14,8 +14,8 @@ def main():
     parser.add_argument('--valid-src', required=True)
     parser.add_argument('--valid-tgt', required=True)
     parser.add_argument('--save-dir', required=True)
-    parser.add_argument('--src-vocab-size')
-    parser.add_argument('--tgt-vocab-size')
+    parser.add_argument('--src-vocab-size', type=int)
+    parser.add_argument('--tgt-vocab-size', type=int)
     args = parser.parse_args()
 
     src_field = io.SrcField(lower=True)
@@ -28,9 +28,8 @@ def main():
         src_path=args.valid_src, tgt_path=args.valid_tgt,
         fields=fields)
 
-    train_dataset.build_vocab(train=train_dataset,
-                              src_vocab_size=args.src_vocab_size,
-                              tgt_vocab_size=args.tgt_vocab_size)
+    src_field.build_vocab(train_dataset.src, max_size=args.src_vocab_size)
+    tgt_field.build_vocab(train_dataset.tgt, max_size=args.tgt_vocab_size)
 
     filename_objs = [('train_dataset.pkl', train_dataset),
                      ('valid_dataset.pkl', valid_dataset)]
