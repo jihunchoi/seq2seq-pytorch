@@ -93,7 +93,8 @@ def train(args):
             src_sentence = ' '.join(ids_to_words(
                 ids=sample_batch.src[0][:, i].data,
                 vocab=src_field.vocab,
-                eos_id=src_field.vocab.stoi[src_field.eos_token]))
+                eos_id=src_field.vocab.stoi[src_field.pad_token],
+                remove_eos=True))
             tgt_sentence = ' '.join(ids_to_words(
                 ids=sample_batch.tgt[0][:, i].data,
                 vocab=tgt_field.vocab,
@@ -116,7 +117,7 @@ def train(args):
                 ref_words = ids_to_words(
                     ids=valid_batch.tgt[0][1:, i].data,
                     vocab=tgt_field.vocab,
-                    eos_id=tgt_field.vocab.stoi[tgt_field.eos_token],
+                    eos_id=tgt_field.vocab.stoi[tgt_field.pad_token],
                     remove_eos=True)
                 hyp_words = ids_to_words(
                     ids=hyp[:, i].data,
