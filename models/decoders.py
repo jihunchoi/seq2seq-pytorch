@@ -9,7 +9,7 @@ from . import attention, basic
 class RecurrentDecoder(nn.Module):
 
     def __init__(self, rnn_type, num_words, word_dim, hidden_dim,
-                 num_layers, attention_type, input_feeding,
+                 num_layers, attention_type, input_feeding, dropout_prob,
                  pad_id, bos_id, eos_id):
         super().__init__()
         self.rnn_type = rnn_type
@@ -18,27 +18,29 @@ class RecurrentDecoder(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.input_feeding = input_feeding
+        self.dropout_prob = dropout_prob
         self.pad_id = pad_id
         self.bos_id = bos_id
         self.eos_id = eos_id
 
+        self.dropout = nn.Dropout(dropout_prob)
         self.embedding = nn.Embedding(num_embeddings=num_words,
                                       embedding_dim=word_dim,
                                       padding_idx=pad_id)
         if rnn_type == 'gru':
             self.rnn = nn.GRU(
                 input_size=word_dim, hidden_size=hidden_dim,
-                num_layers=num_layers)
+                num_layers=num_layers, dropout=dropout_prob)
         elif rnn_type == 'lstm':
             self.rnn = nn.LSTM(
                 input_size=word_dim, hidden_size=hidden_dim,
-                num_layers=num_layers)
+                num_layers=num_layers, dropout=dropout_prob)
         else:
             raise ValueError('Unknown RNN type!')
         if attention_type == 'dot':
             self.attention = attention.DotAttention(
                 input_dim=word_dim, hidden_dim=hidden_dim,
-                input_feeding=input_feeding)
+                input_feeding=input_feeding, dropout_prob=dropout_prob)
         else:
             raise ValueError('Unknown attention type!')
         self.output_linear = nn.Linear(in_features=hidden_dim,
@@ -66,6 +68,7 @@ class RecurrentDecoder(nn.Module):
                 input=None, max_length=None, beam_size=None):
         if self.training:
             input_emb = self.embedding(input)
+            input_emb = self.dropout(input_emb)
             attentional_states, _ = self.attention(
                 rnn=self.rnn,
                 encoder_states=encoder_states,
@@ -112,6 +115,7 @@ class RecurrentDecoder(nn.Module):
                 encoder_lengths=encoder_lengths,
                 initial_state=prev_state,
                 input=prev_input_emb)
+            attentional_state = self.dropout(attentional_state)
             cur_logits = basic.apply_nd(fn=self.output_linear,
                                         input=attentional_state)
             cur_output = cur_logits.max(2)[1]

@@ -5,28 +5,32 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class RecurrentEncoder(nn.Module):
 
-    def __init__(self, rnn_type, num_words, word_dim, hidden_dim,
+    def __init__(self, rnn_type, num_words, word_dim, hidden_dim, dropout_prob,
                  bidirectional, num_layers, pad_id):
         super().__init__()
         self.rnn_type = rnn_type
         self.num_words = num_words
         self.word_dim = word_dim
         self.hidden_dim = hidden_dim
+        self.dropout_prob = dropout_prob
         self.bidirectional = bidirectional
         self.num_layers = num_layers
         self.pad_id = pad_id
 
+        self.dropout = nn.Dropout(dropout_prob)
         self.embedding = nn.Embedding(num_embeddings=num_words,
                                       embedding_dim=word_dim,
                                       padding_idx=pad_id)
         if rnn_type == 'gru':
             self.rnn = nn.GRU(
                 input_size=word_dim, hidden_size=hidden_dim,
-                bidirectional=bidirectional, num_layers=num_layers)
+                bidirectional=bidirectional, num_layers=num_layers,
+                dropout=dropout_prob)
         elif rnn_type == 'lstm':
             self.rnn = nn.LSTM(
                 input_size=word_dim, hidden_size=hidden_dim,
-                bidirectional=bidirectional, num_layers=num_layers)
+                bidirectional=bidirectional, num_layers=num_layers,
+                dropout=dropout_prob)
         else:
             raise ValueError('Unknown RNN type!')
         self.reset_parameters()
@@ -52,6 +56,7 @@ class RecurrentEncoder(nn.Module):
 
     def forward(self, input, lengths):
         input_emb = self.embedding(input)
+        input_emb = self.dropout(input_emb)
         input_emb_packed = pack_padded_sequence(
             input=input_emb, lengths=lengths.tolist())
         rnn_output_packed, rnn_last_state = self.rnn(input_emb_packed)

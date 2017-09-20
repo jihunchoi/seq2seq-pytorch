@@ -7,13 +7,14 @@ from . import basic
 
 class DotAttention(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, input_feeding):
+    def __init__(self, input_dim, hidden_dim, input_feeding, dropout_prob):
         super().__init__()
         self.input_feeding = input_feeding
 
         num_attention_features = 2 * hidden_dim
         if input_feeding:
             num_attention_features += input_dim
+        self.dropout = nn.Dropout(dropout_prob)
         self.attention_linear = nn.Linear(in_features=num_attention_features,
                                           out_features=hidden_dim)
         self.reset_parameters()
@@ -57,6 +58,7 @@ class DotAttention(nn.Module):
         if self.input_feeding:
             attention_features.append(input)
         attention_input = torch.cat(attention_features, dim=2)
+        attention_input = self.dropout(attention_input)
         attentional_states = basic.apply_nd(
             fn=self.attention_linear, input=attention_input)
         return functional.tanh(attentional_states), decoder_last_state
