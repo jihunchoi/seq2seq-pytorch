@@ -14,8 +14,8 @@ def main():
     parser.add_argument('--valid-src', required=True)
     parser.add_argument('--valid-tgt', required=True)
     parser.add_argument('--save-dir', required=True)
-    parser.add_argument('--src-vocab-size', type=int)
-    parser.add_argument('--tgt-vocab-size', type=int)
+    parser.add_argument('--src-vocab-size', type=int, default=50000)
+    parser.add_argument('--tgt-vocab-size', type=int, default=50000)
     args = parser.parse_args()
 
     src_field = io.SrcField(lower=True)
