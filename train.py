@@ -19,8 +19,12 @@ from models.seq2seq import RecurrentSeq2Seq
 def train(args):
     train_path = os.path.join(args.data_dir, 'train_dataset.pkl')
     valid_path = os.path.join(args.data_dir, 'valid_dataset.pkl')
+    fields_path = os.path.join(args.data_dir, 'fields.pkl')
     train_dataset = torch.load(train_path, pickle_module=dill)
     valid_dataset = torch.load(valid_path, pickle_module=dill)
+    fields = torch.load(fields_path, pickle_module=dill)
+    train_dataset.fields = fields
+    valid_dataset.fields = fields
     train_iter, valid_iter = data.BucketIterator.splits(
         datasets=(train_dataset, valid_dataset), batch_size=args.batch_size,
         device=args.gpu)
