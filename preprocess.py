@@ -31,7 +31,7 @@ def main():
         src_path=args.valid_src, tgt_path=args.valid_tgt,
         fields=fields)
     test_dataset = io.NMTDataset(
-        src_path=args.valid_src, tgt_path=args.valid_tgt,
+        src_path=args.test_src, tgt_path=args.test_tgt,
         fields=fields)
 
     src_field.build_vocab(train_dataset.src, max_size=args.src_vocab_size)

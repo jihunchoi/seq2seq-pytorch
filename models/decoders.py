@@ -64,66 +64,16 @@ class RecurrentDecoder(nn.Module):
         init.kaiming_normal(self.output_linear.weight.data)
         init.constant(self.output_linear.bias.data, val=0)
 
-    def forward(self, encoder_states, encoder_lengths, encoder_last_state,
-                input=None, max_length=None, beam_size=None):
-        if self.training:
-            input_emb = self.embedding(input)
-            input_emb = self.dropout(input_emb)
-            attentional_states, _ = self.attention(
-                rnn=self.rnn,
-                encoder_states=encoder_states,
-                encoder_lengths=encoder_lengths,
-                initial_state=encoder_last_state,
-                input=input_emb)
-            logits = basic.apply_nd(fn=self.output_linear,
-                                    input=attentional_states)
-            return logits
-        else:
-            if beam_size == 1:
-                return self.greedy_search(
-                    encoder_states=encoder_states,
-                    encoder_lengths=encoder_lengths,
-                    encoder_last_state=encoder_last_state,
-                    max_length=max_length)
-            else:
-                raise NotImplementedError
-
-    def make_bos(self, batch_size):
-        bos = Variable(torch.LongTensor([[self.bos_id] * batch_size]))
-        return bos
-
-    def update_done(self, done, output):
-        done.masked_fill_(mask=torch.eq(output.data, self.eos_id).squeeze(0),
-                          value=1)
-
-    def greedy_search(self, encoder_states, encoder_lengths,
-                      encoder_last_state, max_length):
-        batch_size = encoder_states.size(1)
-        done = torch.zeros(batch_size).byte()
-        prev_input = self.make_bos(batch_size)
-        prev_state = encoder_last_state
-        outputs = []
-        if encoder_states.is_cuda:
-            device = encoder_states.get_device()
-            done = done.cuda(device)
-            prev_input = prev_input.cuda(device)
-        for time in range(max_length):
-            prev_input_emb = self.embedding(prev_input)
-            attentional_state, cur_state = self.attention(
-                rnn=self.rnn,
-                encoder_states=encoder_states,
-                encoder_lengths=encoder_lengths,
-                initial_state=prev_state,
-                input=prev_input_emb)
-            attentional_state = self.dropout(attentional_state)
-            cur_logits = basic.apply_nd(fn=self.output_linear,
-                                        input=attentional_state)
-            cur_output = cur_logits.max(2)[1]
-            outputs.append(cur_output)
-            self.update_done(done=done, output=cur_output)
-            if done.all():
-                break
-            prev_input = cur_output
-            prev_state = cur_state
-        outputs = torch.cat(outputs, dim=0)
-        return outputs
+    def forward(self, encoder_states, encoder_lengths, prev_state, input):
+        input_emb = self.embedding(input)
+        input_emb = self.dropout(input_emb)
+        decoder_states, decoder_state = self.rnn(
+            input=input_emb, hx=prev_state)
+        attentional_states, attention_weights = self.attention(
+            encoder_states=encoder_states,
+            encoder_lengths=encoder_lengths,
+            decoder_states=decoder_states,
+            input=input_emb)
+        logits = basic.apply_nd(fn=self.output_linear,
+                                input=attentional_states)
+        return logits, decoder_state, attention_weights

@@ -9,6 +9,7 @@ import tensorboard
 import torch
 from nltk.translate.bleu_score import corpus_bleu
 from torch import optim
+from torch.autograd import Variable
 from torch.nn.utils import clip_grad_norm
 from torchtext import data
 
@@ -71,6 +72,36 @@ def train(args):
                               max_length=src_words.size(0) * 2, beam_size=1)
             return generated
 
+    def generate(batch):
+        # Greedy search
+        vocab = tgt_field.vocab
+        bos_id = vocab.stoi[tgt_field.init_token]
+        batch_size = batch.src[0].size(1)
+        max_length = batch.src[0].size(0) * 2
+
+        encoder_input, encoder_lengths = batch.src
+        context, prev_state = model.encoder(
+            input=encoder_input, lengths=encoder_lengths)
+
+        prev_pred = Variable(
+            encoder_lengths.new(1, batch_size).fill_(bos_id))
+        done = torch.zeros(batch_size).byte()
+        hyps = []
+        for t in range(max_length):
+            if done.all():
+                break
+            decoder_input = prev_pred
+            logits, prev_state, attn_weights = model.decoder(
+                encoder_states=context, encoder_lengths=encoder_lengths,
+                prev_state=prev_state, input=decoder_input)
+            pred = logits.max(2)[1]
+            prev_pred = pred
+            hyps.append(pred.data)
+        hyps = torch.cat(hyps, dim=0).transpose(0, 1).tolist()
+        hyps = [hyps[i][:2 * length]
+                for i, length in enumerate(encoder_lengths)]
+        return hyps
+
     def ids_to_words(ids, vocab, eos_id, remove_eos=False):
         words = []
         for id_ in ids:
@@ -91,7 +122,7 @@ def train(args):
         sample_batch = data.Batch(
             data=sample_data, dataset=valid_dataset,
             device=args.gpu, train=False)
-        generated_sample = run_iter(batch=sample_batch)
+        generated_sample = generate(sample_batch)
         for i in range(num_samples):
             print(f'  - Sample #{i}')
             src_sentence = ' '.join(ids_to_words(
@@ -104,7 +135,7 @@ def train(args):
                 vocab=tgt_field.vocab,
                 eos_id=tgt_field.vocab.stoi[tgt_field.eos_token]))
             output_sentence = ' '.join(ids_to_words(
-                ids=generated_sample[:, i].data,
+                ids=generated_sample[i],
                 vocab=tgt_field.vocab,
                 eos_id=tgt_field.vocab.stoi[tgt_field.eos_token]))
             print(f'    Source: {src_sentence}')
@@ -116,15 +147,15 @@ def train(args):
         refs = []
         hyps = []
         for valid_batch in valid_iter:
-            hyp = run_iter(batch=valid_batch)
-            for i in range(hyp.size(1)):
+            hyps_batch = generate(valid_batch)
+            for i, hyp in enumerate(hyps_batch):
                 ref_words = ids_to_words(
                     ids=valid_batch.tgt[0][1:, i].data,
                     vocab=tgt_field.vocab,
                     eos_id=tgt_field.vocab.stoi[tgt_field.pad_token],
                     remove_eos=True)
                 hyp_words = ids_to_words(
-                    ids=hyp[:, i].data,
+                    ids=hyp,
                     vocab=tgt_field.vocab,
                     eos_id=tgt_field.vocab.stoi[tgt_field.eos_token],
                     remove_eos=True)
@@ -191,7 +222,8 @@ def main():
         os.makedirs(args.save_dir)
     args_to_save = ['rnn_type', 'num_layers', 'input_feeding',
                     'word_dim', 'hidden_dim', 'dropout_prob', 'batch_size']
-    args_dict = {arg: getattr(args, arg) for arg in args_to_save}
+    args_dict = {arg.replace('_', '-'): getattr(args, arg)
+                 for arg in args_to_save}
     config_path = os.path.join(args.save_dir, 'config.yml')
     with open(config_path, 'w') as f:
         yaml.dump(args_dict, f, default_flow_style=False)

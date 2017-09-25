@@ -44,11 +44,8 @@ class DotAttention(nn.Module):
         contexts = contexts.transpose(0, 1)
         return contexts
 
-    def forward(self, rnn,
-                encoder_states, encoder_lengths, initial_state,
-                input):
-        decoder_states, decoder_last_state = rnn(
-            input=input, hx=initial_state)
+    def forward(self, encoder_states, encoder_lengths, decoder_states,
+                input=None):
         attention_weights = self.compute_attention_weights(
             attention_queries=decoder_states,
             encoder_states=encoder_states, encoder_lengths=encoder_lengths)
@@ -56,9 +53,10 @@ class DotAttention(nn.Module):
             attention_weights=attention_weights, encoder_states=encoder_states)
         attention_features = [contexts, decoder_states]
         if self.input_feeding:
+            assert input is not None
             attention_features.append(input)
         attention_input = torch.cat(attention_features, dim=2)
         attention_input = self.dropout(attention_input)
         attentional_states = basic.apply_nd(
             fn=self.attention_linear, input=attention_input)
-        return functional.tanh(attentional_states), decoder_last_state
+        return functional.tanh(attentional_states), attention_weights

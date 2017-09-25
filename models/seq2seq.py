@@ -39,12 +39,10 @@ class RecurrentSeq2Seq(nn.Module):
         self.encoder.reset_parameters()
         self.decoder.reset_parameters()
 
-    def forward(self, src_input, src_lengths, tgt_input=None,
-                max_length=None, beam_size=None):
+    def forward(self, src_input, src_lengths, tgt_input):
         encoder_states, encoder_last_state = self.encoder(
             input=src_input, lengths=src_lengths)
-        decoder_output = self.decoder(
+        logits, _, _ = self.decoder(
             encoder_states=encoder_states, encoder_lengths=src_lengths,
-            encoder_last_state=encoder_last_state, input=tgt_input,
-            max_length=max_length, beam_size=beam_size)
-        return decoder_output
+            prev_state=encoder_last_state, input=tgt_input)
+        return logits
