@@ -7,4 +7,4 @@ A collection of seq2seq implementation for personal use.
 - [ ] Convolutional encoder
 - [x] Dot-product attention mechanism (a.k.a. Luong-style attention)
 - [ ] MLP attention mechanism (a.k.a. Bahdanau-style attention)
-- [ ] Beam search
+- [x] Beam search
