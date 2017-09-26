@@ -87,7 +87,7 @@ def test(args):
                 encoder_states=context, encoder_lengths=src_lengths,
                 prev_state=prev_state, input=decoder_input)
             log_probs = functional.log_softmax(logits.squeeze(0))
-            # log_prob: (beam_size, batch_size, num_words)
+            # log_probs: (beam_size, batch_size, num_words)
             log_probs = log_probs.view(args.beam_size, batch_size, -1)
             # attn_weights: (beam_size, batch_size, source_length)
             attn_weights = attn_weights.view(args.beam_size, batch_size, -1)
