@@ -87,7 +87,7 @@ def train(args):
                 break
             decoder_input = prev_pred
             logits, prev_state, attn_weights = model.decoder.forward(
-                encoder_hidden_states=context, encoder_length=src_length,
+                context=context, src_length=src_length,
                 prev_state=prev_state, words=decoder_input)
             pred = logits.max(2)[1]
             prev_pred = pred

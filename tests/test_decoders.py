@@ -18,7 +18,7 @@ class TestDecoders(unittest.TestCase):
             num_layers=1, attention_type='dot', input_feeding=False,
             pad_id=0, bos_id=1, eos_id=2, dropout_prob=0.1)
         logits, decoder_state, attention_weights = dec.forward(
-            encoder_hidden_states=enc_states, encoder_length=enc_length,
+            context=enc_states, src_length=enc_length,
             prev_state=enc_last_state, words=words)
         self.assertTupleEqual(tuple(logits.size()), (4, 3, 20))
         self.assertTupleEqual(tuple(decoder_state.size()), (1, 3, 6))
@@ -34,7 +34,7 @@ class TestDecoders(unittest.TestCase):
             num_layers=3, attention_type='dot', input_feeding=True,
             pad_id=0, bos_id=1, eos_id=2, dropout_prob=0.1)
         logits, decoder_state, attention_weights = dec.forward(
-            encoder_hidden_states=enc_states, encoder_length=enc_length,
+            context=enc_states, src_length=enc_length,
             prev_state=enc_last_state, words=words)
         self.assertTupleEqual(tuple(logits.size()), (4, 3, 20))
         self.assertTupleEqual(tuple(decoder_state.size()), (3, 3, 6))
@@ -51,7 +51,7 @@ class TestDecoders(unittest.TestCase):
             num_layers=1, attention_type='dot', input_feeding=False,
             pad_id=0, bos_id=1, eos_id=2, dropout_prob=0.1)
         logits, decoder_state, attention_weights = dec.forward(
-            encoder_hidden_states=enc_states, encoder_length=enc_length,
+            context=enc_states, src_length=enc_length,
             prev_state=enc_last_state, words=words)
         self.assertTupleEqual(tuple(logits.size()), (4, 3, 20))
         self.assertTupleEqual(tuple(decoder_state[0].size()), (1, 3, 6))
@@ -69,7 +69,7 @@ class TestDecoders(unittest.TestCase):
             num_layers=3, attention_type='dot', input_feeding=True,
             pad_id=0, bos_id=1, eos_id=2, dropout_prob=0.1)
         logits, decoder_state, attention_weights = dec.forward(
-            encoder_hidden_states=enc_states, encoder_length=enc_length,
+            context=enc_states, src_length=enc_length,
             prev_state=enc_last_state, words=words)
         self.assertTupleEqual(tuple(logits.size()), (4, 3, 20))
         self.assertTupleEqual(tuple(decoder_state[0].size()), (3, 3, 6))

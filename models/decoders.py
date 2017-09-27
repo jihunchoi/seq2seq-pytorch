@@ -64,15 +64,14 @@ class RecurrentDecoder(nn.Module):
         init.kaiming_normal(self.output_linear.weight.data)
         init.constant(self.output_linear.bias.data, val=0)
 
-    def forward(self, encoder_hidden_states, encoder_length,
-                prev_state, words):
+    def forward(self, context, src_length, prev_state, words):
         words_emb = self.word_embedding(words)
         words_emb = self.dropout(words_emb)
         rnn_outputs, rnn_state = self.rnn(
             input=words_emb, hx=prev_state)
         attentional_states, attention_weights = self.attention(
-            encoder_states=encoder_hidden_states,
-            encoder_lengths=encoder_length,
+            encoder_states=context,
+            encoder_lengths=src_length,
             decoder_states=rnn_outputs,
             input=words_emb)
         logits = basic.apply_nd(fn=self.output_linear,

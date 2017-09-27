@@ -64,14 +64,13 @@ def test(args):
                      pad_id=pad_id, bos_id=bos_id, eos_id=eos_id,
                      device=args.gpu, vocab=vocab, global_scorer=None)
                 for _ in range(batch_size)]
-        encoder_hidden_states, prev_state = model.encoder(
+        context, prev_state = model.encoder(
             words=src_words_sorted, length=src_length)
-        encoder_hidden_states = encoder_hidden_states[:, orig_indices, :]
+        context = context[:, orig_indices, :]
         prev_state = apply_state(
             fn=lambda s: s[:, orig_indices, :], state=prev_state)
 
-        encoder_hidden_states = encoder_hidden_states.repeat(
-            1, args.beam_size, 1)
+        context = context.repeat(1, args.beam_size, 1)
         src_length = src_length.repeat(args.beam_size)
         prev_state = apply_state(
             fn=lambda s: s.repeat(1, args.beam_size, 1), state=prev_state)
@@ -85,8 +84,7 @@ def test(args):
             decoder_input = decoder_input.view(1, -1)
             decoder_input = Variable(decoder_input, volatile=True)
             logits, prev_state, attn_weights = model.decoder(
-                encoder_hidden_states=encoder_hidden_states,
-                encoder_length=src_length,
+                context=context, src_length=src_length,
                 prev_state=prev_state, words=decoder_input)
             log_probs = functional.log_softmax(logits.squeeze(0))
             # log_probs: (beam_size, batch_size, num_words)
