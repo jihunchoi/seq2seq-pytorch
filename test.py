@@ -36,8 +36,8 @@ def test(args):
         tgt_pad_id=tgt_field.vocab.stoi[tgt_field.pad_token],
         tgt_bos_id=tgt_field.vocab.stoi[tgt_field.init_token],
         tgt_eos_id=tgt_field.vocab.stoi[tgt_field.eos_token])
-    # model.load_state_dict(
-    #    torch.load(args.model_path, map_location=lambda storage, loc: storage))
+    model.load_state_dict(
+        torch.load(args.model_path, map_location=lambda storage, loc: storage))
     if args.gpu > -1:
         model.cuda()
 
