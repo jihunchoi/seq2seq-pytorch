@@ -36,8 +36,8 @@ def test(args):
         tgt_pad_id=tgt_field.vocab.stoi[tgt_field.pad_token],
         tgt_bos_id=tgt_field.vocab.stoi[tgt_field.init_token],
         tgt_eos_id=tgt_field.vocab.stoi[tgt_field.eos_token])
-    model.load_state_dict(
-        torch.load(args.model_path, map_location=lambda storage, loc: storage))
+    # model.load_state_dict(
+    #    torch.load(args.model_path, map_location=lambda storage, loc: storage))
     if args.gpu > -1:
         model.cuda()
 
@@ -54,9 +54,9 @@ def test(args):
         bos_id = vocab.stoi[tgt_field.init_token]
         eos_id = vocab.stoi[tgt_field.eos_token]
 
-        src_words, src_lengths = batch.src
+        src_words, src_length = batch.src
         src_max_length, batch_size = src_words.size()
-        src_lengths_sorted, sort_indices = src_lengths.sort(0, descending=True)
+        src_length, sort_indices = src_length.sort(0, descending=True)
         orig_indices = sort_indices.sort()[1]
         src_words_sorted = src_words[:, sort_indices]
 
@@ -64,14 +64,15 @@ def test(args):
                      pad_id=pad_id, bos_id=bos_id, eos_id=eos_id,
                      device=args.gpu, vocab=vocab, global_scorer=None)
                 for _ in range(batch_size)]
-        context, prev_state = model.encoder(
-            input=src_words_sorted, lengths=src_lengths_sorted)
-        context = context[:, orig_indices, :]
+        encoder_hidden_states, prev_state = model.encoder(
+            words=src_words_sorted, length=src_length)
+        encoder_hidden_states = encoder_hidden_states[:, orig_indices, :]
         prev_state = apply_state(
             fn=lambda s: s[:, orig_indices, :], state=prev_state)
 
-        context = context.repeat(1, args.beam_size, 1)
-        src_lengths = src_lengths.repeat(args.beam_size)
+        encoder_hidden_states = encoder_hidden_states.repeat(
+            1, args.beam_size, 1)
+        src_length = src_length.repeat(args.beam_size)
         prev_state = apply_state(
             fn=lambda s: s.repeat(1, args.beam_size, 1), state=prev_state)
 
@@ -84,8 +85,9 @@ def test(args):
             decoder_input = decoder_input.view(1, -1)
             decoder_input = Variable(decoder_input, volatile=True)
             logits, prev_state, attn_weights = model.decoder(
-                encoder_states=context, encoder_lengths=src_lengths,
-                prev_state=prev_state, input=decoder_input)
+                encoder_hidden_states=encoder_hidden_states,
+                encoder_length=src_length,
+                prev_state=prev_state, words=decoder_input)
             log_probs = functional.log_softmax(logits.squeeze(0))
             # log_probs: (beam_size, batch_size, num_words)
             log_probs = log_probs.view(args.beam_size, batch_size, -1)
@@ -112,7 +114,7 @@ def test(args):
         for i, b in enumerate(beam):
             scores, ks = b.sort_finished(minimum=1)
             hyp, att = b.get_hyp(timestep=ks[0][0], k=ks[0][1])
-            hyps.append(hyp[:src_lengths[i] * 2])
+            hyps.append(hyp[:src_length[i] * 2])
         return hyps
 
     def ids_to_words(ids, vocab, eos_id, remove_eos=False):

@@ -18,9 +18,9 @@ class RecurrentEncoder(nn.Module):
         self.pad_id = pad_id
 
         self.dropout = nn.Dropout(dropout_prob)
-        self.embedding = nn.Embedding(num_embeddings=num_words,
-                                      embedding_dim=word_dim,
-                                      padding_idx=pad_id)
+        self.word_embedding = nn.Embedding(num_embeddings=num_words,
+                                           embedding_dim=word_dim,
+                                           padding_idx=pad_id)
         if rnn_type == 'gru':
             self.rnn = nn.GRU(
                 input_size=word_dim, hidden_size=hidden_dim,
@@ -36,8 +36,8 @@ class RecurrentEncoder(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        init.normal(self.embedding.weight.data, mean=0, std=0.01)
-        self.embedding.weight.data[self.pad_id].fill_(0)
+        init.normal(self.word_embedding.weight.data, mean=0, std=0.01)
+        self.word_embedding.weight.data[self.pad_id].fill_(0)
         for i in range(self.num_layers):
             suffixes = ['']
             if self.bidirectional:
@@ -54,15 +54,14 @@ class RecurrentEncoder(nn.Module):
                 if self.rnn_type == 'lstm':  # Set initial forget bias to 1
                     bias_ih.data.chunk(4)[1].fill_(1)
 
-    def forward(self, input, lengths):
-        input_emb = self.embedding(input)
-        input_emb = self.dropout(input_emb)
-        input_emb_packed = pack_padded_sequence(
-            input=input_emb, lengths=lengths.tolist())
-        rnn_output_packed, rnn_last_state = self.rnn(input_emb_packed)
-        rnn_output, _ = pad_packed_sequence(rnn_output_packed)
-        encoder_states = rnn_output
+    def forward(self, words, length):
+        words_emb = self.word_embedding(words)
+        words_emb = self.dropout(words_emb)
+        words_emb_packed = pack_padded_sequence(
+            input=words_emb, lengths=length.tolist())
+        rnn_outputs_packed, rnn_state = self.rnn(words_emb_packed)
+        encoder_hidden_states, _ = pad_packed_sequence(rnn_outputs_packed)
         # For LSTM, encoder_states does not contain cell states.
         # Thus it is necessary to explicitly return the last state
-        encoder_last_state = rnn_last_state
-        return encoder_states, encoder_last_state
+        encoder_state = rnn_state
+        return encoder_hidden_states, encoder_state

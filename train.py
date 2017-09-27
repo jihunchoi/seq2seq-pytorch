@@ -54,23 +54,18 @@ def train(args):
         summary_writer.add_scalar(name=name, scalar_value=value,
                                   global_step=step)
 
-    def run_iter(batch):
-        src_words, src_lengths = batch.src
-        tgt_words, tgt_lengths = batch.tgt
-        if model.training:
-            logits = model(src_input=src_words, src_lengths=src_lengths,
-                           tgt_input=tgt_words[:-1])
-            loss = basic.sequence_cross_entropy(
-                logits=logits, target=tgt_words[1:], lengths=tgt_lengths - 1)
-            optimizer.zero_grad()
-            loss.backward()
-            clip_grad_norm(model.parameters(), max_norm=1)
-            optimizer.step()
-            return loss
-        else:
-            generated = model(src_input=src_words, src_lengths=src_lengths,
-                              max_length=src_words.size(0) * 2, beam_size=1)
-            return generated
+    def run_train_iter(batch):
+        src_words, src_length = batch.src
+        tgt_words, tgt_length = batch.tgt
+        logits = model(src_words=src_words, src_length=src_length,
+                       tgt_words=tgt_words[:-1])
+        loss = basic.sequence_cross_entropy(
+            logits=logits, targets=tgt_words[1:], length=tgt_length - 1)
+        optimizer.zero_grad()
+        loss.backward()
+        clip_grad_norm(model.parameters(), max_norm=1)
+        optimizer.step()
+        return loss
 
     def generate(batch):
         # Greedy search
@@ -79,27 +74,27 @@ def train(args):
         batch_size = batch.src[0].size(1)
         max_length = batch.src[0].size(0) * 2
 
-        encoder_input, encoder_lengths = batch.src
+        src_words, src_length = batch.src
         context, prev_state = model.encoder(
-            input=encoder_input, lengths=encoder_lengths)
+            words=src_words, length=src_length)
 
         prev_pred = Variable(
-            encoder_lengths.new(1, batch_size).fill_(bos_id))
+            src_length.new(1, batch_size).fill_(bos_id))
         done = torch.zeros(batch_size).byte()
         hyps = []
         for t in range(max_length):
             if done.all():
                 break
             decoder_input = prev_pred
-            logits, prev_state, attn_weights = model.decoder(
-                encoder_states=context, encoder_lengths=encoder_lengths,
-                prev_state=prev_state, input=decoder_input)
+            logits, prev_state, attn_weights = model.decoder.forward(
+                encoder_hidden_states=context, encoder_length=src_length,
+                prev_state=prev_state, words=decoder_input)
             pred = logits.max(2)[1]
             prev_pred = pred
             hyps.append(pred.data)
         hyps = torch.cat(hyps, dim=0).transpose(0, 1).tolist()
         hyps = [hyps[i][:2 * length]
-                for i, length in enumerate(encoder_lengths)]
+                for i, length in enumerate(src_length)]
         return hyps
 
     def ids_to_words(ids, vocab, eos_id, remove_eos=False):
@@ -169,7 +164,7 @@ def train(args):
     for train_batch in train_iter:
         if not model.training:
             model.train()
-        train_loss = run_iter(train_batch)
+        train_loss = run_train_iter(train_batch)
         iter_count = train_iter.iterations
         add_scalar_summary(name='train_loss', value=train_loss.data[0],
                            step=iter_count)

@@ -24,9 +24,9 @@ class RecurrentDecoder(nn.Module):
         self.eos_id = eos_id
 
         self.dropout = nn.Dropout(dropout_prob)
-        self.embedding = nn.Embedding(num_embeddings=num_words,
-                                      embedding_dim=word_dim,
-                                      padding_idx=pad_id)
+        self.word_embedding = nn.Embedding(num_embeddings=num_words,
+                                           embedding_dim=word_dim,
+                                           padding_idx=pad_id)
         if rnn_type == 'gru':
             self.rnn = nn.GRU(
                 input_size=word_dim, hidden_size=hidden_dim,
@@ -48,8 +48,8 @@ class RecurrentDecoder(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        init.normal(self.embedding.weight.data, mean=0, std=0.01)
-        self.embedding.weight.data[self.pad_id].fill_(0)
+        init.normal(self.word_embedding.weight.data, mean=0, std=0.01)
+        self.word_embedding.weight.data[self.pad_id].fill_(0)
         for i in range(self.num_layers):
             weight_ih = getattr(self.rnn, f'weight_ih_l{i}')
             weight_hh = getattr(self.rnn, f'weight_hh_l{i}')
@@ -64,16 +64,17 @@ class RecurrentDecoder(nn.Module):
         init.kaiming_normal(self.output_linear.weight.data)
         init.constant(self.output_linear.bias.data, val=0)
 
-    def forward(self, encoder_states, encoder_lengths, prev_state, input):
-        input_emb = self.embedding(input)
-        input_emb = self.dropout(input_emb)
-        decoder_states, decoder_state = self.rnn(
-            input=input_emb, hx=prev_state)
+    def forward(self, encoder_hidden_states, encoder_length,
+                prev_state, words):
+        words_emb = self.word_embedding(words)
+        words_emb = self.dropout(words_emb)
+        rnn_outputs, rnn_state = self.rnn(
+            input=words_emb, hx=prev_state)
         attentional_states, attention_weights = self.attention(
-            encoder_states=encoder_states,
-            encoder_lengths=encoder_lengths,
-            decoder_states=decoder_states,
-            input=input_emb)
+            encoder_states=encoder_hidden_states,
+            encoder_lengths=encoder_length,
+            decoder_states=rnn_outputs,
+            input=words_emb)
         logits = basic.apply_nd(fn=self.output_linear,
                                 input=attentional_states)
-        return logits, decoder_state, attention_weights
+        return logits, rnn_state, attention_weights
