@@ -16,8 +16,8 @@ class TestDotAttention(unittest.TestCase):
         enc_lengths = torch.LongTensor([4, 2])
         att_weights = att.compute_attention_weights(
             attention_queries=att_queries,
-            encoder_states=enc_states,
-            encoder_lengths=enc_lengths)
+            context=enc_states,
+            src_length=enc_lengths)
         self.assertTrue((att_weights[0, :, 4] < 1e-5).data.all())
         self.assertTrue((att_weights[1, :, 2] < 1e-5).data.all())
         self.assertTrue((att_weights[1, :, 3] < 1e-5).data.all())
@@ -31,8 +31,8 @@ class TestDotAttention(unittest.TestCase):
         enc_lengths = torch.LongTensor([4, 2])
         att_weights = att.compute_attention_weights(
             attention_queries=att_queries,
-            encoder_states=enc_states,
-            encoder_lengths=enc_lengths)
+            context=enc_states,
+            src_length=enc_lengths)
         contexts = att.compute_contexts(attention_weights=att_weights,
                                         encoder_states=enc_states)
         self.assertTupleEqual(tuple(contexts.size()), (3, 2, 4))

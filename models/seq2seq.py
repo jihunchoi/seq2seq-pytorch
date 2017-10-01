@@ -44,5 +44,5 @@ class RecurrentSeq2Seq(nn.Module):
             words=src_words, length=src_length)
         logits, _, _ = self.decoder(
             context=encoder_hidden_states, src_length=src_length,
-            prev_state=encoder_state, words=tgt_words)
+            prev_state={'rnn': encoder_state}, words=tgt_words)
         return logits

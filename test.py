@@ -10,6 +10,7 @@ from torchtext import data
 from tqdm import tqdm
 
 from models.seq2seq import RecurrentSeq2Seq
+from models.decoders import DecoderState
 from utils.beam import Beam
 
 
@@ -41,13 +42,6 @@ def test(args):
     if args.gpu > -1:
         model.cuda()
 
-    def apply_state(fn, state):
-        if isinstance(state, tuple):  # LSTM
-            state = [fn(s) for s in state]
-            return tuple(state)
-        else:
-            return fn(state)
-
     def generate(batch):
         vocab = tgt_field.vocab
         pad_id = vocab.stoi[tgt_field.pad_token]
@@ -56,7 +50,7 @@ def test(args):
 
         src_words, src_length = batch.src
         src_max_length, batch_size = src_words.size()
-        src_length, sort_indices = src_length.sort(0, descending=True)
+        src_length_sorted, sort_indices = src_length.sort(0, descending=True)
         orig_indices = sort_indices.sort()[1]
         src_words_sorted = src_words[:, sort_indices]
 
@@ -64,16 +58,18 @@ def test(args):
                      pad_id=pad_id, bos_id=bos_id, eos_id=eos_id,
                      device=args.gpu, vocab=vocab, global_scorer=None)
                 for _ in range(batch_size)]
-        context, prev_state = model.encoder(
-            words=src_words_sorted, length=src_length)
+        context, encoder_state = model.encoder(
+            words=src_words_sorted, length=src_length_sorted)
         context = context[:, orig_indices, :]
-        prev_state = apply_state(
-            fn=lambda s: s[:, orig_indices, :], state=prev_state)
+        encoder_state = DecoderState.apply_to_rnn_state(
+            lambda s: s[:, orig_indices], rnn_state=encoder_state)
+
+        prev_state = DecoderState(
+            rnn_state=encoder_state, input_feeding=model.input_feeding)
 
         context = context.repeat(1, args.beam_size, 1)
         src_length = src_length.repeat(args.beam_size)
-        prev_state = apply_state(
-            fn=lambda s: s.repeat(1, args.beam_size, 1), state=prev_state)
+        prev_state = prev_state.repeat(args.beam_size)
 
         for t in range(src_max_length * 2):
             if all((b.done() for b in beam)):
@@ -91,22 +87,14 @@ def test(args):
             log_probs = log_probs.view(args.beam_size, batch_size, -1)
             # attn_weights: (beam_size, batch_size, source_length)
             attn_weights = attn_weights.view(args.beam_size, batch_size, -1)
-            # prev_state: (Tuple of) (beam_size, batch_size, hidden_dim)
-            prev_state = apply_state(
-                fn=lambda s: s.view(args.beam_size, batch_size, -1),
-                state=prev_state)
             for j, b in enumerate(beam):
                 b.advance(word_lk=log_probs[:, j].data,
                           attn_out=attn_weights[:, j].data)
                 # Update prev_state to point correct parents
                 current_origin = b.get_current_origin()
-                apply_state(
-                    fn=lambda s: s[:, j].data.copy_(
-                        s[:, j].data.index_select(0, current_origin)),
-                    state=prev_state)
-            prev_state = apply_state(
-                fn=lambda s: s.view(1, args.beam_size * batch_size, -1),
-                state=prev_state)
+                prev_state.beam_update(
+                    batch_index=j, beam_indices=current_origin,
+                    beam_size=args.beam_size)
 
         hyps = []
         for i, b in enumerate(beam):

@@ -75,18 +75,19 @@ def train(args):
         max_length = batch.src[0].size(0) * 2
 
         src_words, src_length = batch.src
-        context, prev_state = model.encoder(
+        context, encoder_rnn_state = model.encoder(
             words=src_words, length=src_length)
 
         prev_pred = Variable(
             src_length.new(1, batch_size).fill_(bos_id))
         done = torch.zeros(batch_size).byte()
         hyps = []
+        prev_state = {'rnn': encoder_rnn_state}
         for t in range(max_length):
             if done.all():
                 break
             decoder_input = prev_pred
-            logits, prev_state, attn_weights = model.decoder.forward(
+            logits, prev_state, attn_weights = model.decoder(
                 context=context, src_length=src_length,
                 prev_state=prev_state, words=decoder_input)
             pred = logits.max(2)[1]
