@@ -182,7 +182,7 @@ def train(args):
             valid_bleu_score = validate()
             add_scalar_summary(name='valid_bleu', value=valid_bleu_score,
                                step=iter_count)
-            print(f'  - Valid BLEU: {valid_bleu_score:.2f}')
+            print(f'  - Valid BLEU: {valid_bleu_score:.4f}')
             if valid_bleu_score > best_valid_bleu:
                 best_valid_bleu = valid_bleu_score
                 model_filename = (f'model-{train_iter.epoch:.3f}'
