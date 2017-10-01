@@ -9,8 +9,7 @@ from models import attention
 class TestDotAttention(unittest.TestCase):
 
     def test_compute_attention_weights(self):
-        att = attention.DotAttention(input_dim=3, hidden_dim=4,
-                                     input_feeding=True, dropout_prob=0.1)
+        att = attention.DotAttention(hidden_dim=4, dropout_prob=0.1)
         att_queries = Variable(torch.randn(3, 2, 4))
         enc_states = Variable(torch.randn(5, 2, 4))
         enc_lengths = torch.LongTensor([4, 2])
@@ -24,8 +23,7 @@ class TestDotAttention(unittest.TestCase):
         self.assertTrue((att_weights[1, :, 4] < 1e-5).data.all())
 
     def test_compute_contexts(self):
-        att = attention.DotAttention(input_dim=3, hidden_dim=4,
-                                     input_feeding=True, dropout_prob=0.1)
+        att = attention.DotAttention(hidden_dim=4, dropout_prob=0.1)
         att_queries = Variable(torch.randn(3, 2, 4))
         enc_states = Variable(torch.randn(5, 2, 4))
         enc_lengths = torch.LongTensor([4, 2])
