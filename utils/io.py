@@ -51,6 +51,7 @@ class NMTDataset(torchtext.data.Dataset):
                   source and target data must be the same length.
         fields:
         """
+        self.max_length = max_length
 
         src_data = self._read_corpus_file(src_path, 0)
         src_examples = self._construct_examples(src_data, "src")
