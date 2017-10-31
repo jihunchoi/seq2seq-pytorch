@@ -1,13 +1,12 @@
+import argparse
 import os
 import random
 
-import yaml
-
-import configargparse as argparse
 import dill
-import tensorboard
 import torch
+import yaml
 from nltk.translate.bleu_score import corpus_bleu
+from tensorboardX import SummaryWriter
 from torch import optim
 from torch.autograd import Variable
 from torch.nn.utils import clip_grad_norm
@@ -29,6 +28,7 @@ def train(args):
     train_iter, valid_iter = data.BucketIterator.splits(
         datasets=(train_dataset, valid_dataset), batch_size=args.batch_size,
         device=args.gpu)
+    train_iter.sort_within_batch = True
 
     src_field = train_dataset.fields['src']
     tgt_field = train_dataset.fields['tgt']
@@ -44,14 +44,13 @@ def train(args):
         tgt_bos_id=tgt_field.vocab.stoi[tgt_field.init_token],
         tgt_eos_id=tgt_field.vocab.stoi[tgt_field.eos_token])
     if args.gpu > -1:
-        model.cuda()
+        model.cuda(args.gpu)
     optimizer = optim.Adam(model.parameters())
 
-    summary_writer = tensorboard.SummaryWriter(
-        log_dir=os.path.join(args.save_dir, 'log'))
+    summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'log'))
 
-    def add_scalar_summary(name, value, step):
-        summary_writer.add_scalar(name=name, scalar_value=value,
+    def add_scalar_summary(tag, value, step):
+        summary_writer.add_scalar(tag=tag, scalar_value=value,
                                   global_step=step)
 
     def run_train_iter(batch):
@@ -167,7 +166,7 @@ def train(args):
             model.train()
         train_loss = run_train_iter(train_batch)
         iter_count = train_iter.iterations
-        add_scalar_summary(name='train_loss', value=train_loss.data[0],
+        add_scalar_summary(tag='train_loss', value=train_loss.data[0],
                            step=iter_count)
 
         if iter_count % args.print_every == 0:
@@ -180,7 +179,7 @@ def train(args):
             print(f'* Epoch {train_iter.epoch:.3f} '
                   f'(Iter #{iter_count}): Validation')
             valid_bleu_score = validate()
-            add_scalar_summary(name='valid_bleu', value=valid_bleu_score,
+            add_scalar_summary(tag='valid_bleu', value=valid_bleu_score,
                                step=iter_count)
             print(f'  - Valid BLEU: {valid_bleu_score:.4f}')
             if valid_bleu_score > best_valid_bleu:
@@ -198,7 +197,6 @@ def train(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', is_config_file=True)
     parser.add_argument('--data-dir', required=True)
     parser.add_argument('--rnn-type', default='lstm')
     parser.add_argument('--num-layers', type=int, default=1)
@@ -216,13 +214,16 @@ def main():
 
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
-    args_to_save = ['rnn_type', 'num_layers', 'input_feeding',
-                    'word_dim', 'hidden_dim', 'dropout_prob', 'batch_size']
-    args_dict = {arg.replace('_', '-'): getattr(args, arg)
-                 for arg in args_to_save}
+    config = {'model': {'rnn_type': args.rnn_type,
+                        'num_layers': args.num_layers,
+                        'input_feeding': args.input_feeding,
+                        'word_dim': args.word_dim,
+                        'hidden_dim': args.hidden_dim,
+                        'dropout_prob': args.dropout_prob},
+              'train': {'batch_size': args.batch_size}}
     config_path = os.path.join(args.save_dir, 'config.yml')
     with open(config_path, 'w') as f:
-        yaml.dump(args_dict, f, default_flow_style=False)
+        yaml.dump(config, f, default_flow_style=False)
 
     train(args)
 

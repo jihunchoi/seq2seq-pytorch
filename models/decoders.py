@@ -102,7 +102,8 @@ class RecurrentDecoder(nn.Module):
             attentional_states = []
             attention_weights = []
             state = prev_state
-            if prev_state['attention'] is None:
+            if ('attention' not in prev_state or
+                        prev_state['attention'] is None):
                 zero_attentional_state = (
                     words_emb.data.new(batch_size, self.hidden_dim).zero_())
                 zero_attentional_state = Variable(zero_attentional_state)
