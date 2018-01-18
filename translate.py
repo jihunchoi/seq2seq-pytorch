@@ -1,8 +1,9 @@
+import argparse
 import os
 
-import configargparse as argparse
 import dill
 import torch
+import yaml
 from nltk.translate.bleu_score import corpus_bleu
 from torch.autograd import Variable
 from torch.nn import functional
@@ -26,17 +27,13 @@ def test(args):
 
     src_field = test_dataset.fields['src']
     tgt_field = test_dataset.fields['tgt']
+
+    with open(args.config, 'r') as f:
+        config = yaml.load(f)
     model = RecurrentSeq2Seq(
         num_src_words=len(src_field.vocab),
         num_tgt_words=len(tgt_field.vocab),
-        word_dim=args.word_dim, hidden_dim=args.hidden_dim,
-        dropout_prob=args.dropout_prob, rnn_type=args.rnn_type,
-        num_layers=args.num_layers, attention_type='dot',
-        input_feeding=args.input_feeding,
-        src_pad_id=src_field.vocab.stoi[src_field.pad_token],
-        tgt_pad_id=tgt_field.vocab.stoi[tgt_field.pad_token],
-        tgt_bos_id=tgt_field.vocab.stoi[tgt_field.init_token],
-        tgt_eos_id=tgt_field.vocab.stoi[tgt_field.eos_token])
+        **config['model'])
     model.load_state_dict(
         torch.load(args.model_path, map_location=lambda storage, loc: storage))
     if args.gpu > -1:
@@ -80,9 +77,9 @@ def test(args):
             decoder_input = decoder_input.view(1, -1)
             decoder_input = Variable(decoder_input, volatile=True)
             logits, prev_state, attn_weights = model.decoder(
-                context=context, src_length=src_length,
-                prev_state=prev_state, words=decoder_input)
-            log_probs = functional.log_softmax(logits.squeeze(0))
+                annotations=context, annotations_length=src_length,
+                state=prev_state, words=decoder_input)
+            log_probs = functional.log_softmax(logits.squeeze(0), dim=1)
             # log_probs: (beam_size, batch_size, num_words)
             log_probs = log_probs.view(args.beam_size, batch_size, -1)
             # attn_weights: (beam_size, batch_size, source_length)
@@ -125,11 +122,6 @@ def test(args):
     for test_batch in tqdm(test_iter):
         hyps_batch = generate(test_batch)
         for i, hyp in enumerate(hyps_batch):
-            ref_words = ids_to_words(
-                ids=test_batch.tgt[0][1:, i].data,
-                vocab=tgt_field.vocab,
-                eos_id=tgt_field.vocab.stoi[tgt_field.pad_token],
-                remove_eos=True)
             hyp_words = ids_to_words(
                 ids=hyp,
                 vocab=tgt_field.vocab,
@@ -137,8 +129,9 @@ def test(args):
                 remove_eos=True)
             save_file.write(' '.join(hyp_words))
             save_file.write('\n')
-            references.append([ref_words])
             hypotheses.append(hyp_words)
+            ref_words = test_dataset[len(hypotheses) - 1].tgt
+            references.append([ref_words])
     bleu = corpus_bleu(list_of_references=references,
                        hypotheses=hypotheses,
                        emulate_multibleu=True)
@@ -147,19 +140,13 @@ def test(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', is_config_file=True)
+    parser.add_argument('--config', required=True)
     parser.add_argument('--model-path', required=True)
-    parser.add_argument('--save-path')
     parser.add_argument('--data-dir', required=True)
-    parser.add_argument('--rnn-type', default='lstm')
-    parser.add_argument('--num-layers', type=int, default=1)
-    parser.add_argument('--input-feeding', default=False, action='store_true')
-    parser.add_argument('--word-dim', type=int, default=256)
-    parser.add_argument('--hidden-dim', type=int, default=256)
-    parser.add_argument('--dropout-prob', type=float, default=0.2)
+    parser.add_argument('--save-path')
     parser.add_argument('--beam-size', type=int, default=1)
     parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--gpu', type=int, default=-1)
+    parser.add_argument('--gpu', type=int, default=0)
     args, _ = parser.parse_known_args()
 
     test(args)

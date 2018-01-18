@@ -8,7 +8,7 @@ import torchtext.data
 import torchtext.vocab
 
 
-PAD_WORD = '<blank>'
+PAD_WORD = '<pad>'
 UNK = 0
 BOS_WORD = '<s>'
 EOS_WORD = '</s>'
@@ -42,16 +42,15 @@ class NMTDataset(torchtext.data.Dataset):
     def sort_key(ex):
         return len(ex.src)
 
-    def __init__(self, src_path, tgt_path, fields, max_length=None):
+    def __init__(self, src_path, tgt_path, fields):
         """
         Create a TranslationDataset given paths and fields.
 
         src_path: location of source-side data
         tgt_path: location of target-side data or None. If it exists, it
                   source and target data must be the same length.
-        fields:
+        fields: tuple of (src_field, trg_field).
         """
-        self.max_length = max_length
 
         src_data = self._read_corpus_file(src_path, 0)
         src_examples = self._construct_examples(src_data, "src")
@@ -65,19 +64,14 @@ class NMTDataset(torchtext.data.Dataset):
                     for src, tgt in zip(src_examples, tgt_examples)]
 
         keys = examples[0].keys()
-        fields = [(k, fields[k]) for k in keys]
         examples = [torchtext.data.Example.fromlist([ex[k] for k in keys],
                                                     fields)
                     for ex in examples]
 
-        def filter_pred(example):
-            return 0 < len(example.src) <= max_length \
-                and 0 < len(example.tgt) <= max_length
+        super(NMTDataset, self).__init__(examples, fields)
 
-        super(NMTDataset, self).__init__(
-            examples, fields, filter_pred if max_length else None)
-
-    def _read_corpus_file(self, path, truncate):
+    @staticmethod
+    def _read_corpus_file(path, truncate):
         """
         path: location of a src or tgt file
         truncate: maximum sequence length (0 for unlimited)
@@ -90,7 +84,8 @@ class NMTDataset(torchtext.data.Dataset):
                 lines = (line[:truncate] for line in lines)
             return lines
 
-    def _construct_examples(self, lines, side):
+    @staticmethod
+    def _construct_examples(lines, side):
         assert side in ["src", "tgt"]
         examples = []
         for line in lines:
@@ -113,7 +108,8 @@ class NMTDataset(torchtext.data.Dataset):
 class SrcField(torchtext.data.Field):
 
     def __init__(self, lower=True):
-        super().__init__(lower=lower, pad_token=PAD_WORD, include_lengths=True)
+        super().__init__(lower=lower, pad_token=PAD_WORD,
+                         eos_token=EOS_WORD, include_lengths=True)
 
 
 class TgtField(torchtext.data.Field):

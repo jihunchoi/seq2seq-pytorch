@@ -11,7 +11,7 @@ class TestEncoders(unittest.TestCase):
     def test_gru_recurrent_encoder_simple(self):
         enc = encoders.RecurrentEncoder(
             rnn_type='gru', num_words=20, word_dim=2, hidden_dim=3,
-            bidirectional=False, num_layers=1, pad_id=0, dropout_prob=0.1)
+            bidirectional=False, num_layers=1, dropout_prob=0.1)
         words = Variable(torch.arange(0, 12).view(4, 3).long())
         length = torch.LongTensor([4, 3, 1])
         enc_states, enc_last_state = enc.forward(words=words, length=length)
@@ -21,7 +21,7 @@ class TestEncoders(unittest.TestCase):
     def test_gru_recurrent_encoder_complex(self):
         enc = encoders.RecurrentEncoder(
             rnn_type='gru', num_words=20, word_dim=2, hidden_dim=3,
-            bidirectional=True, num_layers=3, pad_id=0, dropout_prob=0.1)
+            bidirectional=True, num_layers=3, dropout_prob=0.1)
         words = Variable(torch.arange(0, 12).view(4, 3).long())
         length = torch.LongTensor([4, 3, 1])
         enc_states, enc_last_state = enc.forward(words=words, length=length)
@@ -31,7 +31,7 @@ class TestEncoders(unittest.TestCase):
     def test_lstm_recurrent_encoder_simple(self):
         enc = encoders.RecurrentEncoder(
             rnn_type='lstm', num_words=20, word_dim=2, hidden_dim=3,
-            bidirectional=False, num_layers=1, pad_id=0, dropout_prob=0.1)
+            bidirectional=False, num_layers=1, dropout_prob=0.1)
         words = Variable(torch.arange(0, 12).view(4, 3).long())
         length = torch.LongTensor([4, 3, 1])
         enc_states, enc_last_state = enc.forward(words=words, length=length)
@@ -43,7 +43,7 @@ class TestEncoders(unittest.TestCase):
     def test_lstm_recurrent_encoder_complex(self):
         enc = encoders.RecurrentEncoder(
             rnn_type='lstm', num_words=20, word_dim=2, hidden_dim=3,
-            bidirectional=True, num_layers=3, pad_id=0, dropout_prob=0.1)
+            bidirectional=True, num_layers=3, dropout_prob=0.1)
         words = Variable(torch.arange(0, 12).view(4, 3).long())
         length = torch.LongTensor([4, 3, 1])
         enc_states, enc_last_state = enc.forward(words=words, length=length)

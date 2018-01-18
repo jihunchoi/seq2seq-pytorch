@@ -1,6 +1,7 @@
 import argparse
 import os
 import random
+from pprint import pprint
 
 import dill
 import torch
@@ -13,6 +14,7 @@ from torch.nn.utils import clip_grad_norm
 from torchtext import data
 
 from models import basic
+from models.decoders import DecoderState
 from models.seq2seq import RecurrentSeq2Seq
 
 
@@ -37,15 +39,13 @@ def train(args):
         num_tgt_words=len(tgt_field.vocab),
         word_dim=args.word_dim, hidden_dim=args.hidden_dim,
         dropout_prob=args.dropout_prob, rnn_type=args.rnn_type,
-        num_layers=args.num_layers, attention_type='dot',
-        input_feeding=args.input_feeding,
-        src_pad_id=src_field.vocab.stoi[src_field.pad_token],
-        tgt_pad_id=tgt_field.vocab.stoi[tgt_field.pad_token],
-        tgt_bos_id=tgt_field.vocab.stoi[tgt_field.init_token],
-        tgt_eos_id=tgt_field.vocab.stoi[tgt_field.eos_token])
+        bidirectional=args.bidirectional, num_layers=args.num_layers,
+        attention_type=args.attention_type, input_feeding=args.input_feeding)
     if args.gpu > -1:
         model.cuda(args.gpu)
     optimizer = optim.Adam(model.parameters())
+
+    pprint(model)
 
     summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'log'))
 
@@ -74,21 +74,22 @@ def train(args):
         max_length = batch.src[0].size(0) * 2
 
         src_words, src_length = batch.src
-        context, encoder_rnn_state = model.encoder(
+        annotations, encoder_rnn_state = model.encoder(
             words=src_words, length=src_length)
 
         prev_pred = Variable(
             src_length.new(1, batch_size).fill_(bos_id))
         done = torch.zeros(batch_size).byte()
         hyps = []
-        prev_state = {'rnn': encoder_rnn_state}
+        prev_state = DecoderState(rnn_state=encoder_rnn_state,
+                                  input_feeding=model.input_feeding)
         for t in range(max_length):
             if done.all():
                 break
             decoder_input = prev_pred
             logits, prev_state, attn_weights = model.decoder(
-                context=context, src_length=src_length,
-                prev_state=prev_state, words=decoder_input)
+                annotations=annotations, annotations_length=src_length,
+                state=prev_state, words=decoder_input)
             pred = logits.max(2)[1]
             prev_pred = pred
             hyps.append(pred.data)
@@ -156,8 +157,10 @@ def train(args):
                     remove_eos=True)
                 refs.append([ref_words])
                 hyps.append(hyp_words)
-        return corpus_bleu(list_of_references=refs, hypotheses=hyps,
-                           emulate_multibleu=True)
+        bleu_score = corpus_bleu(list_of_references=refs, hypotheses=hyps,
+                                 emulate_multibleu=True)
+        bleu_score *= 100
+        return bleu_score
 
     best_valid_bleu = -10000
 
@@ -181,11 +184,11 @@ def train(args):
             valid_bleu_score = validate()
             add_scalar_summary(tag='valid_bleu', value=valid_bleu_score,
                                step=iter_count)
-            print(f'  - Valid BLEU: {valid_bleu_score:.4f}')
+            print(f'  - Valid BLEU: {valid_bleu_score:.3f}')
             if valid_bleu_score > best_valid_bleu:
                 best_valid_bleu = valid_bleu_score
                 model_filename = (f'model-{train_iter.epoch:.3f}'
-                                  f'-{valid_bleu_score:.4f}.pkl')
+                                  f'-{valid_bleu_score:.3f}.pkl')
                 model_path = os.path.join(args.save_dir, model_filename)
                 torch.save(model.state_dict(), model_path)
                 print(f'  - Saved the model to: {model_path}')
@@ -199,7 +202,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data-dir', required=True)
     parser.add_argument('--rnn-type', default='lstm')
+    parser.add_argument('--attention-type', default='dot')
     parser.add_argument('--num-layers', type=int, default=1)
+    parser.add_argument('--bidirectional', default=False, action='store_true')
     parser.add_argument('--input-feeding', default=False, action='store_true')
     parser.add_argument('--word-dim', type=int, default=256)
     parser.add_argument('--hidden-dim', type=int, default=256)
@@ -209,18 +214,22 @@ def main():
     parser.add_argument('--print-every', type=int, default=100)
     parser.add_argument('--validate-every', type=int, default=1000)
     parser.add_argument('--save-dir', required=True)
-    parser.add_argument('--gpu', type=int, default=-1)
+    parser.add_argument('--gpu', type=int, default=0)
     args = parser.parse_args()
 
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
     config = {'model': {'rnn_type': args.rnn_type,
+                        'attention_type': args.attention_type,
                         'num_layers': args.num_layers,
+                        'bidirectional': args.bidirectional,
                         'input_feeding': args.input_feeding,
                         'word_dim': args.word_dim,
                         'hidden_dim': args.hidden_dim,
                         'dropout_prob': args.dropout_prob},
               'train': {'batch_size': args.batch_size}}
+    pprint(config)
+
     config_path = os.path.join(args.save_dir, 'config.yml')
     with open(config_path, 'w') as f:
         yaml.dump(config, f, default_flow_style=False)

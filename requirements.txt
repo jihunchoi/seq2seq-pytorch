@@ -1,0 +1,7 @@
+dill
+torch >= 0.3.0
+torchtext >= 0.2.1
+yaml
+nltk
+tqdm
+tensorboardX

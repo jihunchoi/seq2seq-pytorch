@@ -5,8 +5,8 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class RecurrentEncoder(nn.Module):
 
-    def __init__(self, rnn_type, num_words, word_dim, hidden_dim, dropout_prob,
-                 bidirectional, num_layers, pad_id):
+    def __init__(self, rnn_type, num_words, word_dim, hidden_dim,
+                 dropout_prob, bidirectional, num_layers):
         super().__init__()
         self.rnn_type = rnn_type
         self.num_words = num_words
@@ -15,12 +15,10 @@ class RecurrentEncoder(nn.Module):
         self.dropout_prob = dropout_prob
         self.bidirectional = bidirectional
         self.num_layers = num_layers
-        self.pad_id = pad_id
 
         self.dropout = nn.Dropout(dropout_prob)
         self.word_embedding = nn.Embedding(num_embeddings=num_words,
-                                           embedding_dim=word_dim,
-                                           padding_idx=pad_id)
+                                           embedding_dim=word_dim)
         if rnn_type == 'gru':
             self.rnn = nn.GRU(
                 input_size=word_dim, hidden_size=hidden_dim,
@@ -37,7 +35,6 @@ class RecurrentEncoder(nn.Module):
 
     def reset_parameters(self):
         init.normal(self.word_embedding.weight.data, mean=0, std=0.01)
-        self.word_embedding.weight.data[self.pad_id].fill_(0)
         for i in range(self.num_layers):
             suffixes = ['']
             if self.bidirectional:

@@ -9,29 +9,31 @@ from utils import io
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train-src', required=True)
-    parser.add_argument('--train-tgt', required=True)
-    parser.add_argument('--valid-src', required=True)
-    parser.add_argument('--valid-tgt', required=True)
-    parser.add_argument('--test-src', required=True)
-    parser.add_argument('--test-tgt', required=True)
+    parser.add_argument('--src', required=True)
+    parser.add_argument('--tgt', required=True)
+    parser.add_argument('--data-path', required=True)
     parser.add_argument('--save-dir', required=True)
-    parser.add_argument('--train-max-length', type=int, default=50)
-    parser.add_argument('--src-vocab-size', type=int, default=50000)
-    parser.add_argument('--tgt-vocab-size', type=int, default=50000)
+    parser.add_argument('--src-vocab-size', type=int, default=30000)
+    parser.add_argument('--tgt-vocab-size', type=int, default=30000)
     args = parser.parse_args()
 
     src_field = io.SrcField(lower=True)
     tgt_field = io.TgtField(lower=True)
-    fields = {'src': src_field, 'tgt': tgt_field}
+    fields = [('src', src_field), ('tgt', tgt_field)]
+    train_prefix = f'{args.data_path}/train.{args.src}-{args.tgt}'
+    valid_prefix = f'{args.data_path}/valid.{args.src}-{args.tgt}'
+    test_prefix = f'{args.data_path}/test.{args.src}-{args.tgt}'
     train_dataset = io.NMTDataset(
-        src_path=args.train_src, tgt_path=args.train_tgt,
-        fields=fields, max_length=args.train_max_length)
+        src_path=f'{train_prefix}.{args.src}',
+        tgt_path=f'{train_prefix}.{args.tgt}',
+        fields=fields)
     valid_dataset = io.NMTDataset(
-        src_path=args.valid_src, tgt_path=args.valid_tgt,
+        src_path=f'{valid_prefix}.{args.src}',
+        tgt_path=f'{valid_prefix}.{args.tgt}',
         fields=fields)
     test_dataset = io.NMTDataset(
-        src_path=args.test_src, tgt_path=args.test_tgt,
+        src_path=f'{test_prefix}.{args.src}',
+        tgt_path=f'{test_prefix}.{args.tgt}',
         fields=fields)
 
     src_field.build_vocab(train_dataset.src, max_size=args.src_vocab_size)

@@ -1,7 +1,5 @@
 """Copied from OpenNMT-py."""
 
-from __future__ import division
-
 import torch
 
 """
