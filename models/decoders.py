@@ -88,7 +88,7 @@ class RecurrentDecoder(nn.Module):
                 log probabilities. It has the same size as words.
             state (DecoderState): The updated state of the decoder.
             attention_weights (Variable): A float variable of size
-                (batch_size, length, max_src_length), which contains
+                (length, batch_size, max_src_length), which contains
                 the attention weight for each time step of the context.
         """
 
